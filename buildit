@@ -1,0 +1,19 @@
+#!/bin/zsh
+set -euo pipefail
+set -x
+
+imgs=(img{a,b,c})
+
+mkdir -p oci
+
+for i in $imgs; do
+	tag=layertest-${i}:latest
+	sudo docker build -t $tag $i
+	sudo rm -rf oci/$i
+	sudo skopeo copy --all docker-daemon:$tag oci:oci/$i
+	sudo chown $USER. oci/$i
+	mf_hash=$(jq -r '.manifests[0].digest' <oci/$i/index.json | sed 's,:,/,')
+	jq <oci/$i/blobs/$mf_hash >oci/$i/manifest.json
+	cf_hash=$(jq -r '.config.digest' <oci/$i/manifest.json | sed 's,:,/,')
+	jq <oci/$i/blobs/$cf_hash >oci/$i/config.json
+done
